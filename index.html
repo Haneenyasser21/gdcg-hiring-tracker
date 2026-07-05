@@ -79,6 +79,13 @@
   .pct-top { font-weight: 700; color: #2A3344; }
   .pct-sub { color: #8A94A6; }
   .pct-sub.warn { color: #B85450; }
+
+  /* Current stage highlight */
+  .funnel-row.current-stage { background: #FFFBEA; border-radius: 10px; outline: 2px solid #F0A500; outline-offset: -2px; }
+  .current-stage-badge { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; background:#F0A500; color:#fff; border-radius:999px; padding:2px 8px; margin-left:6px; white-space:nowrap; }
+  .set-stage-btn { padding:3px 9px; border-radius:6px; border:1px dashed #D5DCE8; background:transparent; color:#B0BAC9; font-size:11px; font-weight:600; margin-left:4px; line-height:1.4; }
+  .set-stage-btn:hover { border-color:#F0A500; color:#F0A500; }
+
   .cand-wrap { padding-bottom: 12px; border-bottom: 1px solid #F2F4F9; }
   .cand-panel { border-radius: 10px; padding: 14px 16px; margin-top: 4px; }
   .cand-title { font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
@@ -337,6 +344,7 @@ function migrateRole(r) {
   if (r.forwardedDate === undefined) r.forwardedDate = "";
   if (r.hiredDate === undefined) r.hiredDate = "";
   if (!r.resumeLinks) r.resumeLinks = {};  // ← NEW: resume link storage
+  if (!r.currentStage) r.currentStage = null;
   return r;
 }
 
@@ -347,6 +355,7 @@ function seedRoles(){
       counts:{ cvs:100,shortlist:15,phone:9,video:5,usamah:4,bench:2,forwarded:3,cisco:2,hired:1 },
       candidates:{ usamah:["Ahmad Sami","Lina Nasser","Khaled Omar","Reem Faris"], bench:["Ali Hassan","Sara Mohamed"], forwarded:["Ahmad Sami","Lina Nasser","Khaled Omar"], cisco:["Ahmad Sami","Lina Nasser"], hired:["Ahmad Sami"] },
       resumeLinks: {},
+      currentStage: "forwarded",
       forwardedDate: "2026-01-22",
       hiredDate: "2026-02-14" },
     { id:"r2", name:"QA Engineer (Selenium/Cypress)",
@@ -354,6 +363,7 @@ function seedRoles(){
       counts:{ cvs:80,shortlist:18,phone:11,video:6,usamah:5,bench:3,forwarded:4,cisco:3,hired:1 },
       candidates:{ usamah:["Omar Khaled","Nour Ibrahim","Youssef Tamer","Dina Essam","Mona Adel"], bench:["Omar Khaled","Nour Ibrahim","Youssef Tamer"], forwarded:["Omar Khaled","Nour Ibrahim","Youssef Tamer","Dina Essam"], cisco:["Omar Khaled","Nour Ibrahim","Youssef Tamer"], hired:["Omar Khaled"] },
       resumeLinks: {},
+      currentStage: null,
       forwardedDate: "2026-01-28",
       hiredDate: "2026-02-20" }
   ];
@@ -484,7 +494,7 @@ function render(){
   aggBtn.onclick=function(){view="aggregate";openPanel=null;render();}; tabsEl.appendChild(aggBtn);
   if (isEditMode) {
     var addBtn=document.createElement("button"); addBtn.className="tab add"; addBtn.textContent="+ Add role";
-    addBtn.onclick=function(){var id="r"+Date.now();roles.push({id:id,name:"New role",counts:blankCounts(),candidates:blankCands(),milestones:blankMilestones(),forwardedDate:"",hiredDate:"",resumeLinks:{}});saveState();view=id;openPanel=null;render();};
+    addBtn.onclick=function(){var id="r"+Date.now();roles.push({id:id,name:"New role",counts:blankCounts(),candidates:blankCands(),milestones:blankMilestones(),forwardedDate:"",hiredDate:"",resumeLinks:{},currentStage:null});saveState();view=id;openPanel=null;render();};
     tabsEl.appendChild(addBtn);
   }
 
@@ -527,7 +537,9 @@ function render(){
 
   rows2.forEach(function(row,i){
     var isOpen=openPanel===row.key; var pc=PANEL[row.key];
-    var rowDiv=document.createElement("div"); rowDiv.className="funnel-row";
+    var activeRoleForStage=roles.find(function(r){return r.id===view;});
+    var isCurrentStage=activeRoleForStage&&activeRoleForStage.currentStage===row.key;
+    var rowDiv=document.createElement("div"); rowDiv.className="funnel-row"+(isCurrentStage?" current-stage":"");
     if(isOpen||i===rows2.length-1) rowDiv.style.borderBottom="none";
 
     var labelDiv=document.createElement("div"); labelDiv.className="stage-label";
@@ -536,10 +548,19 @@ function render(){
       var ar=document.createElement("span"); ar.className="arrow"; ar.style.color=pc?pc.title:"#0E8088"; ar.style.transform=isOpen?"rotate(90deg)":"rotate(0deg)"; ar.textContent="▶";
       sb.appendChild(ar); sb.appendChild(document.createTextNode(" "+row.label));
       (function(key){sb.onclick=function(){openPanel=openPanel===key?null:key;render();};})(row.key);
+      // Set as current button (edit mode only, non-current rows)
+      if(editable&&!isCurrentStage){ var ssb=document.createElement("button"); ssb.className="set-stage-btn"; ssb.textContent="Set as current";
+        (function(key){ssb.onclick=function(e){e.stopPropagation();var r=roles.find(function(r){return r.id===view;});if(r){r.currentStage=key;}saveState();render();};})(row.key);
+        labelDiv.appendChild(ssb);
+      }
       labelDiv.appendChild(sb);
       var od=document.createElement("div"); od.className="stage-owner"; od.style.paddingLeft="16px"; od.textContent=row.owner; labelDiv.appendChild(od);
     } else {
-      labelDiv.appendChild(document.createTextNode(row.label));
+      var stageText=document.createElement("span"); stageText.textContent=row.label; labelDiv.appendChild(stageText);
+      if(editable&&!isCurrentStage){ var ssb2=document.createElement("button"); ssb2.className="set-stage-btn"; ssb2.textContent="Set as current";
+        (function(key){ssb2.onclick=function(e){e.stopPropagation();var r=roles.find(function(r){return r.id===view;});if(r){r.currentStage=key;}saveState();render();};})(row.key);
+        labelDiv.appendChild(ssb2);
+      }
       var od2=document.createElement("div"); od2.className="stage-owner"; od2.textContent=row.owner; labelDiv.appendChild(od2);
     }
     rowDiv.appendChild(labelDiv);
