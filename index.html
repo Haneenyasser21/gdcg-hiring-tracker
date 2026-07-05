@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GDCG Hiring Funnel Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #F4F6FB; color: #1A2233; min-height: 100vh; }
+
+  /* Lock screen */
+  #lock-screen { position: fixed; inset: 0; background: #F4F6FB; display: flex; align-items: center; justify-content: center; z-index: 9999; }
+  .lock-card { background: #fff; border: 1px solid #EAEEF5; border-radius: 16px; padding: 40px 36px; width: 100%; max-width: 380px; box-shadow: 0 4px 24px rgba(20,30,60,.08); text-align: center; }
+  .lock-logo { font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: #0E8088; font-weight: 700; margin-bottom: 10px; }
+  .lock-title { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+  .lock-sub { font-size: 14px; color: #7A8A9A; margin-bottom: 24px; }
+  .lock-input { width: 100%; padding: 11px 14px; border: 1px solid #D5DCE8; border-radius: 8px; font-size: 15px; font-family: inherit; margin-bottom: 12px; text-align: center; letter-spacing: 3px; }
+  .lock-input:focus { outline: 2px solid #0E8088; outline-offset: 1px; border-color: #0E8088; }
+  .lock-btn { width: 100%; padding: 11px; border-radius: 8px; border: none; background: #0E8088; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .lock-btn:hover { background: #0A6A70; }
+  .lock-error { font-size: 13px; color: #B85450; margin-top: 10px; min-height: 18px; }
+
+  /* App */
+  #app { display: none; padding: 28px 20px; }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  .eyebrow { font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: #0E8088; font-weight: 700; margin-bottom: 6px; }
+  h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 4px; }
+  .subtitle { color: #5A6678; font-size: 15px; margin-bottom: 22px; }
+
+  .mode-badge { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; padding:4px 11px; border-radius:999px; margin-bottom:16px; }
+  .mode-badge.view { background:#F2F4F9; color:#5A6678; }
+  .mode-badge.edit { background:#E9F7F2; color:#0E8088; }
+
+  /* Sync indicator */
+  .sync-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; font-size: 13px; color: #7A8A9A; }
+  .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; flex-shrink: 0; }
+  .sync-dot.synced  { background: #82B366; }
+  .sync-dot.syncing { background: #F0A500; animation: pulse 1s infinite; }
+  .sync-dot.error   { background: #B85450; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; align-items: center; }
+  button { cursor: pointer; font-family: inherit; }
+  .tab { padding: 8px 14px; border-radius: 8px; border: 1px solid #D5DCE8; background: #fff; color: #3A4456; font-size: 13.5px; font-weight: 600; }
+  .tab.active { background: #6C8EBF; border-color: #6C8EBF; color: #fff; }
+  .tab.agg { color: #0E8088; border-color: #0E8088; }
+  .tab.agg.active { background: #0E8088; color: #fff; }
+  .tab.add { border-style: dashed; color: #5A6678; }
+  .role-edit { display: flex; gap: 10px; margin-bottom: 18px; align-items: center; }
+  .role-edit input { flex: 1; padding: 10px 12px; border: 1px solid #D5DCE8; border-radius: 8px; font-size: 15px; font-weight: 600; font-family: inherit; }
+  .btn-del { padding: 8px 14px; border-radius: 8px; border: 1px solid #E8C4C2; background: #fff; color: #B85450; font-size: 13.5px; font-weight: 600; }
+  .alert { background: #FFF4F3; border: 1px solid #F0C9C6; border-radius: 10px; padding: 12px 16px; margin-bottom: 20px; font-size: 14px; }
+  .alert strong { color: #B85450; }
+
+  /* Timeline milestones (JD + Posting) */
+  .timeline-box { background: #fff; border-radius: 14px; padding: 20px 22px; box-shadow: 0 1px 3px rgba(20,30,60,.06); border: 1px solid #EAEEF5; margin-bottom: 16px; }
+  .timeline-box-title { font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #9AA4B5; margin-bottom: 14px; }
+  .milestone-row { display: flex; align-items: center; gap: 14px; padding: 8px 0; }
+  .milestone-label { width: 200px; font-size: 14px; font-weight: 600; color: #2A3344; flex-shrink: 0; }
+  .milestone-label .sub { font-size: 11px; color: #9AA4B5; font-weight: 500; margin-top: 2px; }
+  .milestone-row input[type=date] { padding: 8px 12px; border: 1px solid #D5DCE8; border-radius: 8px; font-size: 14px; font-family: inherit; }
+  .milestone-gap { font-size: 12.5px; color: #7A8A9A; margin-left: auto; }
+  .milestone-gap strong { color: #2A3344; }
+
+  .funnel-box { background: #fff; border-radius: 14px; padding: 24px 22px; box-shadow: 0 1px 3px rgba(20,30,60,.06); border: 1px solid #EAEEF5; }
+  .funnel-row { display: flex; align-items: center; gap: 14px; padding: 9px 0; border-bottom: 1px solid #F2F4F9; }
+  .funnel-row:last-child { border-bottom: none; }
+  .stage-label { width: 170px; font-size: 14px; font-weight: 600; color: #2A3344; flex-shrink: 0; }
+  .stage-owner { font-size: 11px; color: #9AA4B5; font-weight: 500; margin-top: 2px; }
+  .stage-btn { background: none; border: none; padding: 0; text-align: left; font-weight: 600; font-size: 14px; color: #2A3344; display: flex; align-items: center; gap: 5px; font-family: inherit; }
+  .arrow { font-size: 11px; line-height: 1; display: inline-block; transition: transform .2s; }
+  .bar-wrap { flex: 1; position: relative; height: 38px; background: #F2F4F9; border-radius: 7px; overflow: hidden; }
+  .bar-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 7px; transition: width .35s ease; }
+  .bar-num { position: absolute; left: 12px; top: 0; bottom: 0; display: flex; align-items: center; font-weight: 700; font-size: 15px; }
+  .count-cell { width: 64px; text-align: right; flex-shrink: 0; }
+  .count-cell input { width: 58px; padding: 6px 8px; border: 1px solid #D5DCE8; border-radius: 6px; font-size: 14px; text-align: right; font-family: inherit; }
+  .pct-cell { width: 110px; text-align: right; font-size: 12.5px; flex-shrink: 0; }
+  .pct-top { font-weight: 700; color: #2A3344; }
+  .pct-sub { color: #8A94A6; }
+  .pct-sub.warn { color: #B85450; }
+  .cand-wrap { padding-bottom: 12px; border-bottom: 1px solid #F2F4F9; }
+  .cand-panel { border-radius: 10px; padding: 14px 16px; margin-top: 4px; }
+  .cand-title { font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+  .cand-count-row { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #5A6678; }
+  .cand-count-row input { width: 54px; padding: 4px 6px; border: 1px solid #D5DCE8; border-radius: 6px; font-size: 13px; text-align: right; font-family: inherit; }
+  .cand-input-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .cand-input-row input { flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 14px; font-family: inherit; border: 1px solid #D5DCE8; min-width: 120px; }
+  .cand-add-btn { padding: 8px 16px; border-radius: 8px; border: none; color: #fff; font-size: 14px; font-weight: 600; font-family: inherit; }
+  .cand-empty { font-size: 13px; font-style: italic; color: #AAA; }
+  .tags-row { display: flex; flex-wrap: wrap; gap: 7px; }
+  .cand-tag { display: inline-flex; align-items: center; gap: 5px; border-radius: 20px; padding: 4px 10px 4px 12px; font-size: 13px; font-weight: 500; color: #2A3344; }
+  .cand-tag button { background: none; border: none; cursor: pointer; color: #9AA4B5; font-size: 16px; line-height: 1; padding: 0; }
+  .cand-tag button:hover { color: #B85450; }
+  .cand-tag a { color: inherit; text-decoration: underline; text-decoration-style: dotted; font-weight: 600; }
+  .cand-tag a:hover { opacity: 0.75; }
+  .stats-row { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+  .stat-card { flex: 1; min-width: 150px; background: #fff; border: 1px solid #EAEEF5; border-radius: 10px; padding: 14px 16px; }
+  .stat-label { font-size: 12px; color: #8A94A6; margin-bottom: 4px; }
+  .stat-value { font-size: 24px; font-weight: 800; color: #0E8088; }
+  .stat-value.accent-purple { color: #9B72CF; }
+  .stat-value.accent-blue   { color: #6C8EBF; }
+  .hint { font-size: 12.5px; color: #9AA4B5; margin-top: 18px; }
+
+  /* Metrics dashboard */
+  .metrics-section { margin-top: 28px; }
+  .metrics-heading { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+  .metrics-sub { font-size: 13.5px; color: #7A8A9A; margin-bottom: 16px; }
+  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .metric-card { background: #fff; border: 1px solid #EAEEF5; border-radius: 12px; padding: 16px 18px; }
+  .metric-card .lbl { font-size: 12px; color: #8A94A6; margin-bottom: 6px; font-weight: 600; }
+  .metric-card .val { font-size: 26px; font-weight: 800; color: #2A3344; }
+  .metric-card .val.good { color: #4A7C4A; }
+  .metric-card .val.warn { color: #B85450; }
+  .chart-card { background: #fff; border: 1px solid #EAEEF5; border-radius: 14px; padding: 20px 22px; margin-bottom: 16px; }
+  .chart-card-title { font-size: 13px; font-weight: 700; color: #2A3344; margin-bottom: 14px; }
+  .timeline-strip { display: flex; align-items: center; margin: 10px 0 18px; }
+  .ts-node { display: flex; flex-direction: column; align-items: center; min-width: 90px; }
+  .ts-dot { width: 14px; height: 14px; border-radius: 50%; background: #D5DCE8; margin-bottom: 6px; flex-shrink: 0; }
+  .ts-dot.filled { background: #0E8088; }
+  .ts-label { font-size: 11px; color: #5A6678; font-weight: 600; text-align: center; }
+  .ts-date { font-size: 10.5px; color: #9AA4B5; }
+  .ts-line { flex: 1; height: 2px; background: #E5EAF1; position: relative; margin: 0 2px 22px; }
+  .ts-line-days { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #0E8088; font-weight: 700; white-space: nowrap; }
+
+  /* Password modal */
+  .pwd-modal { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; z-index: 9998; }
+  .pwd-card { background: #fff; border-radius: 14px; padding: 30px 28px; width: 100%; max-width: 340px; box-shadow: 0 8px 32px rgba(20,30,60,.15); }
+  .pwd-card h3 { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
+  .pwd-card input { width: 100%; padding: 10px 12px; border: 1px solid #D5DCE8; border-radius: 8px; font-size: 14px; font-family: inherit; margin-bottom: 10px; }
+  .pwd-actions { display: flex; gap: 8px; margin-top: 4px; }
+  .pwd-save { flex:1; padding:10px; border-radius:8px; border:none; background:#0E8088; color:#fff; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .pwd-cancel { flex:1; padding:10px; border-radius:8px; border:1px solid #D5DCE8; background:#fff; color:#5A6678; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .pwd-err { font-size:12.5px; color:#B85450; min-height:16px; margin-bottom:4px; }
+
+  .action-bar { display:flex; gap:8px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
+  .btn-outline { padding:8px 16px; border-radius:8px; border:1px solid #D5DCE8; background:#fff; color:#5A6678; font-size:13.5px; font-weight:600; }
+
+  .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#1A2233; color:#fff; padding:10px 22px; border-radius:8px; font-size:14px; font-weight:600; opacity:0; transition:opacity .3s; pointer-events:none; z-index:9999; white-space:nowrap; }
+  .toast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<!-- Lock screen -->
+<div id="lock-screen">
+  <div class="lock-card">
+    <div class="lock-logo">GDCG · Cisco Placement</div>
+    <div class="lock-title">🔒 Hiring Funnel Tracker</div>
+    <div class="lock-sub">Enter the password to continue</div>
+    <input class="lock-input" type="password" id="pwd-input" placeholder="••••••••" onkeydown="if(event.key==='Enter')tryUnlock()" />
+    <button class="lock-btn" onclick="tryUnlock()">Unlock</button>
+    <div class="lock-error" id="lock-error"></div>
+  </div>
+</div>
+
+<!-- Main app -->
+<div id="app">
+  <div class="wrap">
+    <div class="eyebrow">GDCG · Cisco Placement</div>
+    <h1>Hiring Funnel Tracker</h1>
+    <p class="subtitle">Track every stage from job description to hire — with live timing and volume metrics.</p>
+
+    <div id="mode-badge"></div>
+
+    <div class="sync-bar">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span id="sync-label">Connecting…</span>
+    </div>
+
+    <div class="action-bar" id="action-bar"></div>
+
+    <div class="tabs" id="tabs"></div>
+    <div id="role-edit"></div>
+    <div id="alert-box"></div>
+
+    <div class="timeline-box" id="milestones"></div>
+
+    <div class="funnel-box" id="funnel"></div>
+    <div class="stats-row" id="stats"></div>
+    <p class="hint" id="hint"></p>
+
+    <div class="metrics-section" id="metrics-section"></div>
+  </div>
+</div>
+
+<!-- Change password modal -->
+<div class="pwd-modal" id="pwd-modal" style="display:none">
+  <div class="pwd-card">
+    <h3>🔑 Change Password</h3>
+    <input type="password" id="pwd-current" placeholder="Current password" />
+    <input type="password" id="pwd-new"     placeholder="New password" />
+    <input type="password" id="pwd-confirm" placeholder="Confirm new password" />
+    <div class="pwd-err" id="pwd-err"></div>
+    <div class="pwd-actions">
+      <button class="pwd-cancel" onclick="closePwdModal()">Cancel</button>
+      <button class="pwd-save"   onclick="savePassword()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── Supabase config ──────────────────────────────────────────────────────────
+var SUPA_URL  = "https://uydobigtsxczfoqvfpkm.supabase.co";
+var SUPA_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5ZG9iaWd0c3hjemZvcXZmcGttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MDQyMzQsImV4cCI6MjA5NzI4MDIzNH0.iQMVa3K0MMu8_qVw3iUwoX6P5212tUS0EfidtCLx-pA";
+var TABLE     = "funnel_data";
+var ROW_ID    = "main";
+
+function supaHeaders() {
+  return { "Content-Type":"application/json", "apikey": SUPA_KEY, "Authorization": "Bearer "+SUPA_KEY };
+}
+
+function setSyncStatus(state, msg) {
+  var dot   = document.getElementById("sync-dot");
+  var label = document.getElementById("sync-label");
+  dot.className = "sync-dot " + state;
+  label.textContent = msg;
+}
+
+async function loadFromSupabase() {
+  setSyncStatus("syncing", "Loading data…");
+  try {
+    var res  = await fetch(SUPA_URL+"/rest/v1/"+TABLE+"?id=eq."+ROW_ID+"&select=data", { headers: supaHeaders() });
+    var rows = await res.json();
+    if (rows && rows.length && rows[0].data && Array.isArray(rows[0].data) && rows[0].data.length) {
+      roles = rows[0].data.map(migrateRole);
+      view  = roles[0].id;
+    } else {
+      await saveToSupabase();
+    }
+    setSyncStatus("synced", isEditMode ? "Live — your changes sync instantly" : "Live — viewing latest data");
+    render();
+  } catch(e) {
+    setSyncStatus("error", "Could not connect to database");
+    render();
+  }
+}
+
+var saveTimer = null;
+async function saveToSupabase() {
+  if (!isEditMode) return;
+  setSyncStatus("syncing", "Saving…");
+  try {
+    await fetch(SUPA_URL+"/rest/v1/"+TABLE, {
+      method: "POST",
+      headers: Object.assign({}, supaHeaders(), { "Prefer": "resolution=merge-duplicates" }),
+      body: JSON.stringify({ id: ROW_ID, data: roles, updated_at: new Date().toISOString() })
+    });
+    setSyncStatus("synced", "Saved — everyone sees this now");
+  } catch(e) {
+    setSyncStatus("error", "Save failed — check your connection");
+  }
+}
+
+function saveState() {
+  if (!isEditMode) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(function(){ saveToSupabase(); }, 800);
+}
+
+// ─── Edit-mode gate via secret URL param ──────────────────────────────────────
+var EDIT_SECRET = "haneen2026";
+var isEditMode = false;
+function checkEditMode() {
+  var params = new URLSearchParams(window.location.search);
+  isEditMode = params.get("edit") === EDIT_SECRET;
+}
+
+// ─── Password ─────────────────────────────────────────────────────────────────
+var PWD_KEY          = "gdcg_pwd";
+var DEFAULT_PASSWORD = "gdcg2026";
+
+function getPassword() { return localStorage.getItem(PWD_KEY) || DEFAULT_PASSWORD; }
+
+function tryUnlock() {
+  var val = document.getElementById("pwd-input").value;
+  if (val === getPassword()) {
+    document.getElementById("lock-screen").style.display = "none";
+    document.getElementById("app").style.display = "block";
+    loadFromSupabase();
+  } else {
+    document.getElementById("lock-error").textContent = "Incorrect password. Please try again.";
+    document.getElementById("pwd-input").value = "";
+    document.getElementById("pwd-input").focus();
+  }
+}
+
+function openPwdModal()  { document.getElementById("pwd-modal").style.display="flex"; document.getElementById("pwd-current").focus(); }
+function closePwdModal() {
+  document.getElementById("pwd-modal").style.display="none";
+  ["pwd-current","pwd-new","pwd-confirm"].forEach(function(id){document.getElementById(id).value="";});
+  document.getElementById("pwd-err").textContent="";
+}
+function savePassword() {
+  var cur=document.getElementById("pwd-current").value;
+  var nw =document.getElementById("pwd-new").value;
+  var cf =document.getElementById("pwd-confirm").value;
+  var err=document.getElementById("pwd-err");
+  if (cur!==getPassword()) { err.textContent="Current password is incorrect."; return; }
+  if (nw.length<4)          { err.textContent="New password must be at least 4 characters."; return; }
+  if (nw!==cf)              { err.textContent="Passwords do not match."; return; }
+  localStorage.setItem(PWD_KEY, nw);
+  closePwdModal();
+  showToast("✓ Password updated!");
+}
+
+// ─── Stages ───────────────────────────────────────────────────────────────────
+var STAGES = [
+  { key:"cvs",       label:"CVs sourced",              owner:"Haneen",  color:"#6C8EBF" },
+  { key:"shortlist", label:"Shortlisted (AI + human)", owner:"Haneen",  color:"#6C8EBF" },
+  { key:"phone",     label:"Phone screen",              owner:"Haneen",  color:"#6C8EBF" },
+  { key:"video",     label:"Video interview",           owner:"Haneen",  color:"#6C8EBF" },
+  { key:"usamah",   label:"Forwarded to Usamah",       owner:"Haneen",  color:"#0E8088", hasCandidates:true, countManual:true  },
+  { key:"bench",    label:"Bench",                      owner:"Haneen",  color:"#9B72CF", hasCandidates:true, countManual:false },
+  { key:"forwarded", label:"Forwarded to Basem",        owner:"Haneen",  color:"#0E8088", hasCandidates:true, countManual:true  },
+  { key:"cisco",    label:"Cisco interview",            owner:"Cisco",   color:"#888",    hasCandidates:true, countManual:true  },
+  { key:"hired",    label:"Hired",                      owner:"Outcome", color:"#82B366", hasCandidates:true, countManual:true  }
+];
+var PANEL = {
+  usamah:    { bg:"#F0FAF9", border:"#B2DDE0", title:"#0E8088", btn:"#0E8088", tag:"#D4EEEF" },
+  bench:     { bg:"#F9F7FD", border:"#E4D9F5", title:"#9B72CF", btn:"#9B72CF", tag:"#EEE8FA" },
+  forwarded: { bg:"#F0FAF9", border:"#B2DDE0", title:"#0E8088", btn:"#0E8088", tag:"#D4EEEF" },
+  cisco:     { bg:"#F6F6F6", border:"#CFCFCF", title:"#555",    btn:"#666",    tag:"#E8E8E8" },
+  hired:     { bg:"#F2FAF2", border:"#B8DDB8", title:"#4A7C4A", btn:"#82B366", tag:"#D6EDD6" }
+};
+var CAND_KEYS = STAGES.filter(function(s){return s.hasCandidates;}).map(function(s){return s.key;});
+function blankCounts(){ var c={}; STAGES.forEach(function(s){c[s.key]=0;}); return c; }
+function blankCands() { var c={}; CAND_KEYS.forEach(function(k){c[k]=[];}); return c; }
+function blankMilestones() { return { jdReceived: "", jobPosted: "" }; }
+
+function migrateRole(r) {
+  if (!r.milestones) r.milestones = blankMilestones();
+  if (!r.candidates) r.candidates = blankCands();
+  if (!r.counts) r.counts = blankCounts();
+  if (r.forwardedDate === undefined) r.forwardedDate = "";
+  if (r.hiredDate === undefined) r.hiredDate = "";
+  if (!r.resumeLinks) r.resumeLinks = {};  // ← NEW: resume link storage
+  return r;
+}
+
+function seedRoles(){
+  return [
+    { id:"r1", name:"Senior Go / Microservices",
+      milestones:{ jdReceived:"2026-01-05", jobPosted:"2026-01-08" },
+      counts:{ cvs:100,shortlist:15,phone:9,video:5,usamah:4,bench:2,forwarded:3,cisco:2,hired:1 },
+      candidates:{ usamah:["Ahmad Sami","Lina Nasser","Khaled Omar","Reem Faris"], bench:["Ali Hassan","Sara Mohamed"], forwarded:["Ahmad Sami","Lina Nasser","Khaled Omar"], cisco:["Ahmad Sami","Lina Nasser"], hired:["Ahmad Sami"] },
+      resumeLinks: {},
+      forwardedDate: "2026-01-22",
+      hiredDate: "2026-02-14" },
+    { id:"r2", name:"QA Engineer (Selenium/Cypress)",
+      milestones:{ jdReceived:"2026-01-10", jobPosted:"2026-01-13" },
+      counts:{ cvs:80,shortlist:18,phone:11,video:6,usamah:5,bench:3,forwarded:4,cisco:3,hired:1 },
+      candidates:{ usamah:["Omar Khaled","Nour Ibrahim","Youssef Tamer","Dina Essam","Mona Adel"], bench:["Omar Khaled","Nour Ibrahim","Youssef Tamer"], forwarded:["Omar Khaled","Nour Ibrahim","Youssef Tamer","Dina Essam"], cisco:["Omar Khaled","Nour Ibrahim","Youssef Tamer"], hired:["Omar Khaled"] },
+      resumeLinks: {},
+      forwardedDate: "2026-01-28",
+      hiredDate: "2026-02-20" }
+  ];
+}
+
+var roles = seedRoles();
+var view  = "r1";
+var openPanel = null;
+var chartInstance = null;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function pct(a,b){ return Number(b)>0?Math.round((Number(a)/Number(b))*100)+"%":"—"; }
+function getActive(){
+  if(view==="aggregate"){
+    var c=blankCounts();
+    roles.forEach(function(r){STAGES.forEach(function(s){c[s.key]+=(Number(r.counts[s.key])||0);});});
+    return {counts:c,candidates:null};
+  }
+  var r=roles.find(function(r){return r.id===view;});
+  return {counts:r?r.counts:blankCounts(),candidates:r?(r.candidates||blankCands()):blankCands()};
+}
+function showToast(msg){
+  var t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show");
+  setTimeout(function(){t.classList.remove("show");},3000);
+}
+function daysBetween(d1,d2){
+  if(!d1||!d2) return null;
+  var a=new Date(d1), b=new Date(d2);
+  if(isNaN(a)||isNaN(b)) return null;
+  return Math.round((b-a)/86400000);
+}
+function fmtDate(d){
+  if(!d) return "—";
+  var dt=new Date(d); if(isNaN(dt)) return "—";
+  return dt.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});
+}
+
+// ─── Render: top action bar / mode badge ──────────────────────────────────────
+function renderModeBadge() {
+  var el = document.getElementById("mode-badge");
+  el.innerHTML = isEditMode
+    ? '<span class="mode-badge edit">✏️ Editor mode</span>'
+    : '<span class="mode-badge view">👁 View only</span>';
+}
+function renderActionBar() {
+  var el = document.getElementById("action-bar"); el.innerHTML = "";
+  if (isEditMode) {
+    var pwdBtn = document.createElement("button"); pwdBtn.className="btn-outline"; pwdBtn.textContent="🔑 Change password";
+    pwdBtn.onclick = openPwdModal;
+    el.appendChild(pwdBtn);
+  }
+}
+
+// ─── Render: milestone dates ──────────────────────────────────────────────────
+function renderMilestones() {
+  var el = document.getElementById("milestones");
+  if (view === "aggregate") { el.style.display="none"; return; }
+  el.style.display = "block";
+  var r = roles.find(function(r){return r.id===view;});
+  if (!r) { el.innerHTML=""; return; }
+  if (!r.milestones) r.milestones = blankMilestones();
+
+  var jd  = r.milestones.jdReceived;
+  var jp  = r.milestones.jobPosted;
+  var fwd = r.forwardedDate || "";
+  var hd  = r.hiredDate || "";
+
+  el.innerHTML = "";
+  var title = document.createElement("div"); title.className="timeline-box-title"; title.textContent="Hiring timeline — key dates";
+  el.appendChild(title);
+
+  function makeRow(label, sub, value, onChange, gapLabelAfter) {
+    var row = document.createElement("div"); row.className="milestone-row";
+    var lbl = document.createElement("div"); lbl.className="milestone-label";
+    lbl.appendChild(document.createTextNode(label));
+    var subEl = document.createElement("div"); subEl.className="sub"; subEl.textContent=sub;
+    lbl.appendChild(subEl);
+    row.appendChild(lbl);
+    var input = document.createElement("input"); input.type="date"; input.value=value||"";
+    if (!isEditMode) input.disabled = true;
+    input.onchange = function(){ onChange(this.value); saveState(); render(); };
+    row.appendChild(input);
+    if (gapLabelAfter) {
+      var gap = document.createElement("div"); gap.className="milestone-gap"; gap.innerHTML = gapLabelAfter;
+      row.appendChild(gap);
+    }
+    return row;
+  }
+
+  var gapJdPost = daysBetween(jd, jp);
+  var gapPostFwd = daysBetween(jp, fwd);
+  var gapFwdHire = daysBetween(fwd, hd);
+
+  el.appendChild(makeRow("Job description received", "Date JD was received from client", jd, function(v){ r.milestones.jdReceived=v; }));
+  el.appendChild(makeRow("Job posted", "Date the role went live", jp, function(v){ r.milestones.jobPosted=v; },
+    gapJdPost!==null ? ("<strong>"+gapJdPost+"d</strong> since JD received") : null));
+  el.appendChild(makeRow("Forwarded to Basem", "Date resumes were sent to Basem", fwd, function(v){ r.forwardedDate=v; },
+    gapPostFwd!==null ? ("<strong>"+gapPostFwd+"d</strong> since posting") : null));
+  el.appendChild(makeRow("Hired", "Date the candidate was hired", hd, function(v){ r.hiredDate=v; },
+    gapFwdHire!==null ? ("<strong>"+gapFwdHire+"d</strong> since forwarded") : null));
+
+  var totalGap = daysBetween(jd, hd);
+  if (totalGap !== null) {
+    var totalRow = document.createElement("div"); totalRow.className="milestone-row";
+    var totalLbl = document.createElement("div"); totalLbl.style.cssText="font-size:13px;color:#2A3344;font-weight:700;";
+    totalLbl.innerHTML = "Total time-to-hire: <span style='color:#0E8088'>"+totalGap+" day"+(totalGap===1?"":"s")+"</span>";
+    totalRow.appendChild(totalLbl);
+    el.appendChild(totalRow);
+  }
+}
+
+// ─── Main render ───────────────────────────────────────────────────────────────
+function render(){
+  renderModeBadge();
+  renderActionBar();
+  renderMilestones();
+
+  var act=getActive(); var counts=act.counts; var cands=act.candidates;
+  var editable = isEditMode && view!=="aggregate";
+
+  // Tabs
+  var tabsEl=document.getElementById("tabs"); tabsEl.innerHTML="";
+  roles.forEach(function(r){
+    var b=document.createElement("button"); b.className="tab"+(view===r.id?" active":""); b.textContent=r.name;
+    b.onclick=function(){view=r.id;openPanel=null;render();}; tabsEl.appendChild(b);
+  });
+  var aggBtn=document.createElement("button"); aggBtn.className="tab agg"+(view==="aggregate"?" active":""); aggBtn.textContent="All roles (aggregate)";
+  aggBtn.onclick=function(){view="aggregate";openPanel=null;render();}; tabsEl.appendChild(aggBtn);
+  if (isEditMode) {
+    var addBtn=document.createElement("button"); addBtn.className="tab add"; addBtn.textContent="+ Add role";
+    addBtn.onclick=function(){var id="r"+Date.now();roles.push({id:id,name:"New role",counts:blankCounts(),candidates:blankCands(),milestones:blankMilestones(),forwardedDate:"",hiredDate:"",resumeLinks:{}});saveState();view=id;openPanel=null;render();};
+    tabsEl.appendChild(addBtn);
+  }
+
+  // Role edit
+  var editEl=document.getElementById("role-edit"); editEl.innerHTML="";
+  if(editable){
+    var aRole=roles.find(function(r){return r.id===view;});
+    var div=document.createElement("div"); div.className="role-edit";
+    var inp=document.createElement("input"); inp.type="text"; inp.value=aRole?aRole.name:"";
+    inp.oninput=function(){var r=roles.find(function(r){return r.id===view;});if(r)r.name=this.value;saveState();
+      var btns=document.getElementById("tabs").querySelectorAll("button");
+      roles.forEach(function(r2,i){if(btns[i])btns[i].textContent=r2.name;});
+    };
+    div.appendChild(inp);
+    if(roles.length>1){
+      var delBtn=document.createElement("button"); delBtn.className="btn-del"; delBtn.textContent="Delete role";
+      delBtn.onclick=function(){roles=roles.filter(function(r){return r.id!==view;});saveState();view=roles[0].id;openPanel=null;render();};
+      div.appendChild(delBtn);
+    }
+    editEl.appendChild(div);
+  }
+
+  // Rows
+  var top=Number(counts[STAGES[0].key])||0;
+  var rows2=STAGES.map(function(s,i){
+    var n=Number(counts[s.key])||0;
+    var prev=i===0?n:(Number(counts[STAGES[i-1].key])||0);
+    var stepRate=i===0?100:prev>0?(n/prev)*100:0;
+    var overall=top>0?(n/top)*100:0;
+    var drop=i===0?0:prev-n;
+    var dropRate=i===0?0:prev>0?(drop/prev)*100:0;
+    return Object.assign({},s,{n:n,stepRate:stepRate,overall:overall,drop:drop,dropRate:dropRate});
+  });
+  var worst=null;
+  rows2.forEach(function(r,i){if(i>0&&(!worst||r.dropRate>worst.dropRate))worst=r;});
+  document.getElementById("alert-box").innerHTML=worst&&top>0?'<div class="alert"><strong>Biggest drop-off:</strong> '+worst.label+' — '+Math.round(worst.dropRate)+'% of candidates lost here ('+worst.drop+' people). Focus improvement effort on the stage just before this.</div>':"";
+
+  var maxN=Math.max(1,Math.max.apply(null,rows2.map(function(r){return r.n;})));
+  var funnelEl=document.getElementById("funnel"); funnelEl.innerHTML="";
+
+  rows2.forEach(function(row,i){
+    var isOpen=openPanel===row.key; var pc=PANEL[row.key];
+    var rowDiv=document.createElement("div"); rowDiv.className="funnel-row";
+    if(isOpen||i===rows2.length-1) rowDiv.style.borderBottom="none";
+
+    var labelDiv=document.createElement("div"); labelDiv.className="stage-label";
+    if(row.hasCandidates){
+      var sb=document.createElement("button"); sb.className="stage-btn";
+      var ar=document.createElement("span"); ar.className="arrow"; ar.style.color=pc?pc.title:"#0E8088"; ar.style.transform=isOpen?"rotate(90deg)":"rotate(0deg)"; ar.textContent="▶";
+      sb.appendChild(ar); sb.appendChild(document.createTextNode(" "+row.label));
+      (function(key){sb.onclick=function(){openPanel=openPanel===key?null:key;render();};})(row.key);
+      labelDiv.appendChild(sb);
+      var od=document.createElement("div"); od.className="stage-owner"; od.style.paddingLeft="16px"; od.textContent=row.owner; labelDiv.appendChild(od);
+    } else {
+      labelDiv.appendChild(document.createTextNode(row.label));
+      var od2=document.createElement("div"); od2.className="stage-owner"; od2.textContent=row.owner; labelDiv.appendChild(od2);
+    }
+    rowDiv.appendChild(labelDiv);
+
+    var bw=document.createElement("div"); bw.className="bar-wrap";
+    var bf=document.createElement("div"); bf.className="bar-fill"; bf.style.width=((row.n/maxN)*100)+"%"; bf.style.background=row.color; if(row.n===0)bf.style.minWidth="0";
+    bw.appendChild(bf);
+    var bn=document.createElement("div"); bn.className="bar-num"; bn.style.color=(row.n/maxN)>0.18?"#fff":"#2A3344"; bn.textContent=row.n;
+    bw.appendChild(bn); rowDiv.appendChild(bw);
+
+    var cc=document.createElement("div"); cc.className="count-cell";
+    if(row.hasCandidates&&editable&&!row.countManual){
+      var sp=document.createElement("span"); sp.style.cssText="font-size:14px;font-weight:700;color:"+(pc?pc.title:"#9B72CF"); sp.textContent=row.n; cc.appendChild(sp);
+    } else if(editable){
+      var ci=document.createElement("input"); ci.type="number"; ci.min="0"; ci.value=row.n;
+      (function(key){ci.oninput=function(){var r=roles.find(function(r){return r.id===view;});if(r){r.counts[key]=Math.max(0,parseInt(this.value)||0);}saveState();render();};})(row.key);
+      cc.appendChild(ci);
+    } else { var sp2=document.createElement("span"); sp2.style.cssText="font-size:14px;font-weight:600"; sp2.textContent=row.n; cc.appendChild(sp2); }
+    rowDiv.appendChild(cc);
+
+    var pctCell=document.createElement("div"); pctCell.className="pct-cell";
+    var pt=document.createElement("div"); pt.className="pct-top"; pt.innerHTML=row.overall.toFixed(0)+'% <span style="font-weight:400;color:#9AA4B5">of top</span>'; pctCell.appendChild(pt);
+    if(i>0){var ps=document.createElement("div");ps.className="pct-sub"+(row.dropRate>60?" warn":"");ps.textContent=row.stepRate.toFixed(0)+"% of prev step";pctCell.appendChild(ps);}
+    rowDiv.appendChild(pctCell);
+    funnelEl.appendChild(rowDiv);
+
+    if(row.hasCandidates&&isOpen&&pc){
+      var pw=document.createElement("div"); pw.className="cand-wrap";
+      var pan=document.createElement("div"); pan.className="cand-panel"; pan.style.background=pc.bg; pan.style.border="1px solid "+pc.border;
+      var candList=cands?(cands[row.key]||[]):[];
+      var dispCount=row.countManual?row.n:candList.length;
+      var tr=document.createElement("div"); tr.className="cand-title"; tr.style.color=pc.title;
+      var ts=document.createElement("span"); ts.textContent=row.label+" — Candidates ("+dispCount+")"; tr.appendChild(ts);
+      if(row.countManual && editable){
+        var cr=document.createElement("div"); cr.className="cand-count-row"; cr.appendChild(document.createTextNode("Count: "));
+        var cni=document.createElement("input"); cni.type="number"; cni.min="0"; cni.value=row.n;
+        (function(key){cni.oninput=function(){var r=roles.find(function(r){return r.id===view;});if(r){r.counts[key]=Math.max(0,parseInt(this.value)||0);}saveState();render();};})(row.key);
+        cr.appendChild(cni); tr.appendChild(cr);
+      }
+      pan.appendChild(tr);
+
+      // ── Add candidate row (edit mode): name + optional Drive link ─────────
+      if (editable) {
+        var ir=document.createElement("div"); ir.className="cand-input-row";
+        var ni=document.createElement("input"); ni.type="text"; ni.placeholder="Candidate name…"; ni.style.border="1px solid "+pc.border; ni.style.flex="1";
+        var li=document.createElement("input"); li.type="url"; li.placeholder="Google Drive resume link (optional)"; li.style.border="1px solid "+pc.border; li.style.flex="2";
+        var ab=document.createElement("button"); ab.className="cand-add-btn"; ab.textContent="Add"; ab.style.background=pc.btn;
+        function doAdd(key,nameEl,linkEl){
+          var val=nameEl.value.trim(); if(!val) return;
+          var url=linkEl.value.trim();
+          var r=roles.find(function(r){return r.id===view;}); if(!r) return;
+          if(!r.candidates)r.candidates=blankCands(); if(!r.candidates[key])r.candidates[key]=[];
+          if(!r.resumeLinks)r.resumeLinks={};
+          r.candidates[key].push(val);
+          if(url){ if(!r.resumeLinks[key])r.resumeLinks[key]={}; r.resumeLinks[key][val]=url; }
+          if(!STAGES.find(function(s){return s.key===key;}).countManual)r.counts[key]=r.candidates[key].length;
+          saveState(); nameEl.value=""; linkEl.value=""; render();
+          setTimeout(function(){var el=document.querySelector(".cand-input-row input");if(el)el.focus();},10);
+        }
+        (function(key){
+          ab.onclick=function(){doAdd(key,ni,li);};
+          ni.onkeydown=function(e){if(e.key==="Enter")li.focus();};
+          li.onkeydown=function(e){if(e.key==="Enter")doAdd(key,ni,li);};
+        })(row.key);
+        ir.appendChild(ni); ir.appendChild(li); ir.appendChild(ab); pan.appendChild(ir);
+      }
+
+      // ── Candidate tags ────────────────────────────────────────────────────
+      if(!candList.length){
+        var em=document.createElement("p"); em.className="cand-empty"; em.textContent="No candidates added yet."; pan.appendChild(em);
+      } else {
+        var activeRole2=roles.find(function(r){return r.id===view;});
+        var tgr=document.createElement("div"); tgr.className="tags-row";
+        candList.forEach(function(name,idx){
+          var tg=document.createElement("span"); tg.className="cand-tag"; tg.style.background=pc.tag;
+          // Name — clickable link if resume URL exists, plain text otherwise
+          var resumeUrl=activeRole2&&activeRole2.resumeLinks&&activeRole2.resumeLinks[row.key]&&activeRole2.resumeLinks[row.key][name];
+          if(resumeUrl){
+            var a=document.createElement("a"); a.href=resumeUrl; a.target="_blank"; a.rel="noopener noreferrer"; a.textContent=name; a.title="Open resume";
+            tg.appendChild(a);
+          } else {
+            tg.appendChild(document.createTextNode(name));
+          }
+          // In edit mode: 📎/🔗 button to add/edit link, × to remove
+          if(editable){
+            var lb=document.createElement("button"); lb.textContent=resumeUrl?"🔗":"📎"; lb.title=resumeUrl?"Edit resume link":"Add resume link"; lb.style.fontSize="12px";
+            (function(k,n){lb.onclick=function(e){e.stopPropagation();
+              var cur=(activeRole2&&activeRole2.resumeLinks&&activeRole2.resumeLinks[k]&&activeRole2.resumeLinks[k][n])||"";
+              var newUrl=prompt("Google Drive resume link for "+n+":\n(Leave blank to remove)",cur);
+              if(newUrl===null)return;
+              var r2=roles.find(function(r){return r.id===view;}); if(!r2)return;
+              if(!r2.resumeLinks)r2.resumeLinks={};
+              if(!r2.resumeLinks[k])r2.resumeLinks[k]={};
+              if(newUrl.trim()){r2.resumeLinks[k][n]=newUrl.trim();}else{delete r2.resumeLinks[k][n];}
+              saveState();render();
+            };})(row.key,name);
+            tg.appendChild(lb);
+            var rb=document.createElement("button"); rb.textContent="×"; rb.title="Remove";
+            (function(k,j,n){rb.onclick=function(){var r=roles.find(function(r){return r.id===view;});if(!r)return;r.candidates[k].splice(j,1);if(r.resumeLinks&&r.resumeLinks[k])delete r.resumeLinks[k][n];if(!STAGES.find(function(s){return s.key===k;}).countManual)r.counts[k]=r.candidates[k].length;saveState();render();};})(row.key,idx,name);
+            tg.appendChild(rb);
+          }
+          tgr.appendChild(tg);
+        });
+        pan.appendChild(tgr);
+      }
+      pw.appendChild(pan); funnelEl.appendChild(pw);
+    }
+  });
+
+  var se=document.getElementById("stats"); se.innerHTML="";
+  function sc(label,val,accentClass){var card=document.createElement("div");card.className="stat-card";var l=document.createElement("div");l.className="stat-label";l.textContent=label;var v=document.createElement("div");v.className="stat-value"+(accentClass?(" "+accentClass):"");v.textContent=val;card.appendChild(l);card.appendChild(v);return card;}
+  se.appendChild(sc("CV → Hire",         pct(counts.hired,     counts.cvs)));
+  se.appendChild(sc("Bench → Forwarded", pct(counts.forwarded, counts.bench), "accent-purple"));
+  se.appendChild(sc("Forwarded → Hired", pct(counts.hired,     counts.forwarded), "accent-blue"));
+
+  document.getElementById("hint").textContent = editable
+    ? "Changes save automatically and are visible to everyone with the link."
+    : (isEditMode ? "" : "You're viewing in read-only mode. Contact Haneen to make changes.");
+
+  renderMetrics();
+}
+
+// ─── Metrics dashboard ────────────────────────────────────────────────────────
+function renderMetrics() {
+  var el = document.getElementById("metrics-section");
+  el.innerHTML = "";
+
+  var heading = document.createElement("div"); heading.className="metrics-heading"; heading.textContent="Hiring timeline metrics";
+  el.appendChild(heading);
+  var sub = document.createElement("div"); sub.className="metrics-sub"; sub.textContent="Time-to-hire and monthly hiring volume across all roles";
+  el.appendChild(sub);
+
+  var timingData = roles.map(function(r){
+    var m = r.milestones || blankMilestones();
+    var jdToPost   = daysBetween(m.jdReceived, m.jobPosted);
+    var postToFwd  = daysBetween(m.jobPosted, getFirstForwardDate(r));
+    var jdToFwd    = daysBetween(m.jdReceived, getFirstForwardDate(r));
+    return { role: r.name, jdToPost: jdToPost, postToFwd: postToFwd, jdToFwd: jdToFwd, hiredDate: r.hiredDate || null };
+  });
+
+  var validJdToFwd = timingData.map(function(t){return t.jdToFwd;}).filter(function(v){return v!==null && v>=0;});
+  var avgJdToFwd = validJdToFwd.length ? Math.round(validJdToFwd.reduce(function(a,b){return a+b;},0)/validJdToFwd.length) : null;
+
+  var validJdToPost = timingData.map(function(t){return t.jdToPost;}).filter(function(v){return v!==null && v>=0;});
+  var avgJdToPost = validJdToPost.length ? Math.round(validJdToPost.reduce(function(a,b){return a+b;},0)/validJdToPost.length) : null;
+
+  var hiresThisMonth = countHiresInCurrentMonth();
+  var totalHired = roles.reduce(function(sum,r){return sum + (Number(r.counts.hired)||0);},0);
+
+  var grid = document.createElement("div"); grid.className="metrics-grid";
+  grid.appendChild(metricCard("Avg. time: JD → Posting", avgJdToPost!==null ? avgJdToPost+" days" : "—"));
+  grid.appendChild(metricCard("Avg. time: JD → Forwarded to Basem", avgJdToFwd!==null ? avgJdToFwd+" days" : "—", "good"));
+  grid.appendChild(metricCard("Hires this month", hiresThisMonth));
+  grid.appendChild(metricCard("Total hired (all roles)", totalHired));
+  el.appendChild(grid);
+
+  if (view !== "aggregate") {
+    var activeRole = roles.find(function(r){return r.id===view;});
+    if (activeRole) {
+      var stripCard = document.createElement("div"); stripCard.className="chart-card";
+      var stripTitle = document.createElement("div"); stripTitle.className="chart-card-title"; stripTitle.textContent="Timeline for: "+activeRole.name;
+      stripCard.appendChild(stripTitle);
+      stripCard.appendChild(buildTimelineStrip(activeRole));
+      el.appendChild(stripCard);
+    }
+  }
+
+  var chartCard = document.createElement("div"); chartCard.className="chart-card";
+  var chartTitle = document.createElement("div"); chartTitle.className="chart-card-title"; chartTitle.textContent="Hires per month";
+  chartCard.appendChild(chartTitle);
+  var canvasWrap = document.createElement("div"); canvasWrap.style.cssText="position:relative;height:240px;";
+  var canvas = document.createElement("canvas"); canvas.id="monthlyChart";
+  canvas.setAttribute("role","img");
+  canvas.setAttribute("aria-label","Bar chart showing number of hires per month");
+  canvasWrap.appendChild(canvas);
+  chartCard.appendChild(canvasWrap);
+  el.appendChild(chartCard);
+
+  renderMonthlyChart();
+}
+
+function getFirstForwardDate(role) {
+  if (role.forwardedDate) return role.forwardedDate;
+  return null;
+}
+
+function countHiresInCurrentMonth() {
+  var now = new Date();
+  var count = 0;
+  roles.forEach(function(r){
+    if (r.hiredDate) {
+      var d = new Date(r.hiredDate);
+      if (!isNaN(d) && d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear()) {
+        count += Number(r.counts.hired) || 0;
+      }
+    }
+  });
+  return count;
+}
+
+function metricCard(label, value, tone) {
+  var card = document.createElement("div"); card.className="metric-card";
+  var l = document.createElement("div"); l.className="lbl"; l.textContent=label;
+  var v = document.createElement("div"); v.className="val"+(tone?(" "+tone):""); v.textContent=value;
+  card.appendChild(l); card.appendChild(v);
+  return card;
+}
+
+function buildTimelineStrip(role) {
+  var m = role.milestones || blankMilestones();
+  var wrap = document.createElement("div"); wrap.className="timeline-strip";
+
+  var nodes = [
+    { label:"JD received", date:m.jdReceived },
+    { label:"Job posted", date:m.jobPosted },
+    { label:"Forwarded to Basem", date:role.forwardedDate || null },
+    { label:"Hired", date:role.hiredDate || null }
+  ];
+
+  nodes.forEach(function(node, i){
+    var n = document.createElement("div"); n.className="ts-node";
+    var dot = document.createElement("div"); dot.className="ts-dot"+(node.date?" filled":"");
+    n.appendChild(dot);
+    var lbl = document.createElement("div"); lbl.className="ts-label"; lbl.textContent=node.label;
+    n.appendChild(lbl);
+    var dt = document.createElement("div"); dt.className="ts-date"; dt.textContent=fmtDate(node.date);
+    n.appendChild(dt);
+    wrap.appendChild(n);
+
+    if (i < nodes.length - 1) {
+      var line = document.createElement("div"); line.className="ts-line";
+      var gap = daysBetween(node.date, nodes[i+1].date);
+      if (gap !== null) {
+        var gapLbl = document.createElement("div"); gapLbl.className="ts-line-days"; gapLbl.textContent=gap+"d";
+        line.appendChild(gapLbl);
+      }
+      wrap.appendChild(line);
+    }
+  });
+
+  return wrap;
+}
+
+function renderMonthlyChart() {
+  var canvas = document.getElementById("monthlyChart");
+  if (!canvas || typeof Chart === "undefined") return;
+
+  var monthCounts = {};
+  roles.forEach(function(r){
+    if (r.hiredDate) {
+      var d = new Date(r.hiredDate);
+      if (!isNaN(d)) {
+        var key = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"00");
+        monthCounts[key] = (monthCounts[key]||0) + (Number(r.counts.hired)||0);
+      }
+    }
+  });
+
+  var sortedKeys = Object.keys(monthCounts).sort();
+  var labels = sortedKeys.map(function(k){
+    var parts = k.split("-");
+    var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, 1);
+    return d.toLocaleDateString(undefined,{month:"short",year:"2-digit"});
+  });
+  var data = sortedKeys.map(function(k){return monthCounts[k];});
+
+  if (!labels.length) { labels=["No data yet"]; data=[0]; }
+
+  if (chartInstance) { chartInstance.destroy(); }
+  chartInstance = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [{ label: "Hires", data: data, backgroundColor: "#0E8088", borderRadius: 6, maxBarThickness: 48 }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 } },
+        x: { ticks: { autoSkip: false } }
+      }
+    }
+  });
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+checkEditMode();
+document.getElementById("pwd-input").focus();
+</script>
+</body>
+</html>
