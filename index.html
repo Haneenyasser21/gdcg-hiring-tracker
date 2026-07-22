@@ -320,7 +320,7 @@ var STAGES = [
   { key:"phone",     label:"Phone screen",              owner:"Haneen",  color:"#6C8EBF" },
   { key:"video",     label:"Video interview",           owner:"Haneen",  color:"#6C8EBF" },
  { key:"video",     label:"Video interview",           owner:"Haneen",  color:"#6C8EBF" },
-  { key:"reinterview", label:"Re-Interview",            owner:"Haneen",  color:"#6C8EBF" },
+ { key:"reinterview", label:"Re-Interview",            owner:"Haneen",  color:"#6C8EBF", hasCandidates:true, countManual:true  },
   { key:"usamah",   label:"Forwarded to Usamah (Optional)", owner:"Haneen",  color:"#0E8088", hasCandidates:true, countManual:true  }, 
   { key:"bench",    label:"Bench",                      owner:"Haneen",  color:"#9B72CF", hasCandidates:true, countManual:false },
   { key:"forwarded", label:"Forwarded to Basem",        owner:"Haneen",  color:"#0E8088", hasCandidates:true, countManual:true  },
@@ -328,6 +328,7 @@ var STAGES = [
   { key:"hired",    label:"Hired",                      owner:"Outcome", color:"#82B366", hasCandidates:true, countManual:true  }
 ];
 var PANEL = {
+ reinterview: { bg:"#FFF8E8", border:"#F0DBA8", title:"#B8860B", btn:"#D4A017", tag:"#F5E6C0" },
   usamah:    { bg:"#F0FAF9", border:"#B2DDE0", title:"#0E8088", btn:"#0E8088", tag:"#D4EEEF" },
   bench:     { bg:"#F9F7FD", border:"#E4D9F5", title:"#9B72CF", btn:"#9B72CF", tag:"#EEE8FA" },
   forwarded: { bg:"#F0FAF9", border:"#B2DDE0", title:"#0E8088", btn:"#0E8088", tag:"#D4EEEF" },
